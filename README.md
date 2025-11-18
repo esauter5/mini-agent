@@ -1,6 +1,8 @@
 # Mini Agent
 
-A modular AI agent framework built with Claude and Node.js, featuring a terminal UI and pluggable tool system.
+A lightweight, modular AI agent framework inspired by Claude Code, built from scratch to experiment with agentic patterns and architectures. This CLI-based agent provides a clean terminal interface and extensible tool system for exploring how AI agents can interact with files, execute tools, and maintain context through conversations.
+
+**Purpose:** A learning-focused implementation for testing different agentic concepts, tool architectures, and interaction patterns with Claude's API.
 
 ## Features
 
