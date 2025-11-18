@@ -13,6 +13,39 @@ export class Agent {
   }
 
   /**
+   * Build the tools array including custom and built-in tools
+   * @returns {Array} Tools array for the API
+   */
+  getTools() {
+    const tools = [...this.toolRegistry.getDefinitions()];
+
+    // Add built-in web search if enabled
+    if (this.config.tools.webSearch.enabled) {
+      tools.push({
+        type: 'web_search_20250305',
+        name: 'web_search',
+        max_uses: this.config.tools.webSearch.maxUses
+      });
+    }
+
+    return tools;
+  }
+
+  /**
+   * Build the system prompt with current date
+   * @returns {string} System prompt with date inserted
+   */
+  getSystemPrompt() {
+    const today = new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    return this.config.anthropic.systemPrompt.replace('{DATE}', today);
+  }
+
+  /**
    * Send a message and get a response
    * @param {string} userMessage - The user's message
    * @param {object} callbacks - Callbacks for streaming updates
@@ -38,11 +71,12 @@ export class Agent {
       const stream = await this.client.messages.stream({
         model: this.config.anthropic.model,
         max_tokens: this.config.anthropic.maxTokens,
+        system: this.getSystemPrompt(),
         thinking: {
           type: 'enabled',
           budget_tokens: this.config.anthropic.thinkingBudget
         },
-        tools: this.toolRegistry.getDefinitions(),
+        tools: this.getTools(),
         messages: this.messages
       });
 
@@ -50,7 +84,7 @@ export class Agent {
       const streamHandler = new StreamingHandler();
 
       for await (const event of stream) {
-        streamHandler.handleEvent(event, onTextUpdate);
+        streamHandler.handleEvent(event, onTextUpdate, onToolCall);
       }
 
       // Get cleaned response
@@ -78,17 +112,24 @@ export class Agent {
       for (const toolCall of toolCalls) {
         onToolCall && onToolCall(toolCall.name, toolCall.input);
 
-        const result = await this.toolRegistry.execute(toolCall.name, toolCall.input);
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: toolCall.id,
-          content: result
-        });
+        // Built-in tools (like web_search_20250305) are executed server-side by Anthropic
+        // Only execute custom tools from our registry
+        if (!toolCall.name.startsWith('web_search')) {
+          const result = await this.toolRegistry.execute(toolCall.name, toolCall.input);
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: toolCall.id,
+            content: result
+          });
+        }
+        // For built-in tools, results are automatically included by the API
       }
 
-      // Send tool results back
-      onDebug && onDebug('tool_results', { role: 'user', content: toolResults });
-      this.messages.push({ role: 'user', content: toolResults });
+      // Send tool results back (only if we have custom tool results)
+      if (toolResults.length > 0) {
+        onDebug && onDebug('tool_results', { role: 'user', content: toolResults });
+        this.messages.push({ role: 'user', content: toolResults });
+      }
     }
 
     return finalText;

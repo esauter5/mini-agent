@@ -10,6 +10,10 @@ export class ChatRenderer {
     this.chatContent = [];
     this.thinkingLineIdx = null;
     this.agentLineIdx = null;
+    this.spinnerLineIdx = null;
+    this.spinnerInterval = null;
+    this.spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    this.spinnerFrame = 0;
   }
 
   /**
@@ -34,10 +38,13 @@ export class ChatRenderer {
         this.chatContent[this.thinkingLineIdx] = formatThinking(text);
       }
     } else {
-      if (isStart) {
+      // If starting and we don't have an agent line yet, create one
+      // (This handles the case where spinner wasn't shown)
+      if (isStart && this.agentLineIdx === null) {
         this.agentLineIdx = this.chatContent.length;
         this.chatContent.push(formatAgentMessage(''));
       }
+      // Update the agent line (either from spinner or newly created)
       if (this.agentLineIdx !== null) {
         this.chatContent[this.agentLineIdx] = formatAgentMessage(text);
       }
@@ -64,6 +71,39 @@ export class ChatRenderer {
   addToolCall(name, input) {
     this.chatContent.push(formatToolCall(name, input));
     this.render();
+  }
+
+  /**
+   * Start an animated spinner with a message
+   */
+  startSpinner(message) {
+    // Stop any existing spinner
+    this.stopSpinner();
+
+    // Create agent line for spinner
+    this.agentLineIdx = this.chatContent.length;
+    this.chatContent.push('');
+    this.spinnerFrame = 0;
+
+    // Animate the spinner on the agent line
+    this.spinnerInterval = setInterval(() => {
+      const frame = this.spinnerFrames[this.spinnerFrame];
+      // Format as agent message with spinner
+      this.chatContent[this.agentLineIdx] = formatAgentMessage(`${frame} ${message}`);
+      this.render();
+      this.spinnerFrame = (this.spinnerFrame + 1) % this.spinnerFrames.length;
+    }, 80);
+  }
+
+  /**
+   * Stop the spinner
+   */
+  stopSpinner() {
+    if (this.spinnerInterval) {
+      clearInterval(this.spinnerInterval);
+      this.spinnerInterval = null;
+    }
+    // Note: We don't remove the line anymore - it will be reused for the agent response
   }
 
   /**
