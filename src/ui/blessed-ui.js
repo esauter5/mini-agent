@@ -222,8 +222,16 @@ export class BlessedUI {
   async handleUserMessage(message) {
     this.renderer.addUserMessage(message);
 
+    // Start spinner while waiting for Claude's response
+    this.renderer.startSpinner('Thinking...');
+
     const callbacks = {
       onTextUpdate: (text, isThinking, isStart) => {
+        // Only stop spinner when actual text response starts (not thinking)
+        if (isStart && !isThinking) {
+          this.renderer.stopSpinner();
+        }
+
         // Only show thinking if thinking mode is enabled
         if (isThinking && !this.thinkingMode) {
           return;
@@ -231,6 +239,7 @@ export class BlessedUI {
         this.renderer.updateAgentResponse(text, isThinking, isStart);
       },
       onToolCall: (name, input) => {
+        // Only show tool call details if debug modes enabled
         if (this.toolsMode || this.debugMode) {
           this.renderer.addToolCall(name, input);
         }

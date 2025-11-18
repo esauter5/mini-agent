@@ -12,10 +12,11 @@ export class StreamingHandler {
    * Process a streaming event
    * @param {object} event - The streaming event
    * @param {Function} onTextUpdate - Callback when text updates (text, isThinking)
+   * @param {Function} onToolCall - Callback when a tool is called (name, input)
    */
-  handleEvent(event, onTextUpdate) {
+  handleEvent(event, onTextUpdate, onToolCall) {
     if (event.type === 'content_block_start') {
-      this.handleBlockStart(event, onTextUpdate);
+      this.handleBlockStart(event, onTextUpdate, onToolCall);
     } else if (event.type === 'content_block_delta') {
       this.handleBlockDelta(event, onTextUpdate);
     }
@@ -24,7 +25,7 @@ export class StreamingHandler {
   /**
    * Handle content_block_start event
    */
-  handleBlockStart(event, onTextUpdate) {
+  handleBlockStart(event, onTextUpdate, onToolCall) {
     if (event.content_block.type === 'text') {
       this.fullResponse.push({ type: 'text', text: '' });
       // Notify that agent started responding
@@ -46,6 +47,29 @@ export class StreamingHandler {
       });
       // Notify that thinking started
       onTextUpdate && onTextUpdate(this.thinkingText, true, true);
+    } else if (event.content_block.type === 'server_tool_use') {
+      // Built-in tool use (like web_search)
+      this.fullResponse.push({
+        type: 'server_tool_use',
+        id: event.content_block.id,
+        name: event.content_block.name,
+        input: event.content_block.input || {}
+      });
+      // Notify immediately during streaming
+      onToolCall && onToolCall(event.content_block.name, event.content_block.input || {});
+    } else if (event.content_block.type === 'web_search_tool_result') {
+      // Web search results from built-in tool
+      this.fullResponse.push({
+        type: 'web_search_tool_result',
+        tool_use_id: event.content_block.tool_use_id,
+        content: event.content_block.content || []
+      });
+    } else {
+      // Unknown block type - create generic placeholder
+      this.fullResponse.push({
+        type: event.content_block.type,
+        data: event.content_block
+      });
     }
   }
 
@@ -54,6 +78,12 @@ export class StreamingHandler {
    */
   handleBlockDelta(event, onTextUpdate) {
     const index = event.index;
+
+    // Safety check: ensure the block exists
+    if (!this.fullResponse[index]) {
+      // Silently ignore deltas for blocks that don't exist yet
+      return;
+    }
 
     if (event.delta.type === 'text_delta') {
       this.fullResponse[index].text += event.delta.text;
@@ -101,12 +131,31 @@ export class StreamingHandler {
           thinking: block.thinking,
           signature: block.signature
         };
+      } else if (block.type === 'server_tool_use') {
+        // Built-in tool use - return as is
+        return {
+          type: 'server_tool_use',
+          id: block.id,
+          name: block.name,
+          input: block.input
+        };
+      } else if (block.type === 'web_search_tool_result') {
+        // Web search results - MUST be preserved with encrypted content for citations
+        return {
+          type: 'web_search_tool_result',
+          tool_use_id: block.tool_use_id,
+          content: block.content
+        };
+      } else if (block.type === 'text') {
+        // Text blocks
+        return {
+          type: 'text',
+          text: block.text || ''
+        };
       }
-      // For text blocks, return as is
-      return {
-        type: 'text',
-        text: block.text || ''
-      };
+
+      // Unknown block type - return as is
+      return block;
     });
   }
 

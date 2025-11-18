@@ -8,6 +8,7 @@ A lightweight, modular AI agent framework inspired by Claude Code, built from sc
 
 - 🤖 Powered by Claude Sonnet 4.5 with extended thinking
 - 🔧 Pluggable tool architecture for easy extensibility
+- 🌐 Built-in web search powered by Anthropic (US only)
 - 🎨 Terminal UI with blessed
 - 🔒 Sandbox security for file operations
 - 💭 Streaming responses with real-time updates
@@ -28,6 +29,16 @@ ANTHROPIC_API_KEY=your_api_key_here
 ```
 
 See `.env.example` for all available configuration options.
+
+### Environment Variables
+
+- `ANTHROPIC_API_KEY` - Your Anthropic API key (required)
+- `MODEL` - Claude model to use (default: claude-sonnet-4-5-20250929)
+- `MAX_TOKENS` - Maximum tokens per response (default: 4096)
+- `THINKING_BUDGET` - Tokens allocated for extended thinking (default: 3000)
+- `SANDBOX_DIR` - Directory for sandboxed file operations (default: ./sandbox)
+- `WEB_SEARCH_ENABLED` - Enable web search tool (default: true)
+- `WEB_SEARCH_MAX_USES` - Max web searches per turn (default: 5)
 
 ## Usage
 
@@ -62,10 +73,18 @@ mini-agent/
 
 ## Available Tools
 
+### Custom Tools
 - **read_file** - Read files from the sandbox directory
 - **write_file** - Create new files in the sandbox
 - **edit_file** - Edit existing files with find/replace
 - **list_files** - List all files in the sandbox
+
+### Built-in Tools
+- **web_search** - Search the web for current information (powered by Anthropic, US only)
+  - Enabled by default with max 5 searches per conversation turn
+  - Configure via environment variables:
+    - `WEB_SEARCH_ENABLED=false` to disable
+    - `WEB_SEARCH_MAX_USES=3` to change the limit
 
 ## Adding New Tools
 
