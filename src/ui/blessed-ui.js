@@ -12,6 +12,7 @@ export class BlessedUI {
     this.config = config;
     this.debugMode = false;
     this.toolsMode = false;
+    this.thinkingMode = false;
 
     this.setupScreen();
     this.setupChatBox();
@@ -185,6 +186,9 @@ export class BlessedUI {
    */
   setupCommands() {
     this.commands = {
+      '/help': () => {
+        this.showHelp();
+      },
       '/debug': () => {
         this.debugMode = !this.debugMode;
         this.renderer.addSystemMessage(`Debug mode: ${this.debugMode ? 'ON' : 'OFF'}`);
@@ -192,6 +196,10 @@ export class BlessedUI {
       '/tools': () => {
         this.toolsMode = !this.toolsMode;
         this.renderer.addSystemMessage(`Tools debug mode: ${this.toolsMode ? 'ON' : 'OFF'}`);
+      },
+      '/thinking': () => {
+        this.thinkingMode = !this.thinkingMode;
+        this.renderer.addSystemMessage(`Thinking mode: ${this.thinkingMode ? 'ON' : 'OFF'}`);
       }
     };
   }
@@ -216,6 +224,10 @@ export class BlessedUI {
 
     const callbacks = {
       onTextUpdate: (text, isThinking, isStart) => {
+        // Only show thinking if thinking mode is enabled
+        if (isThinking && !this.thinkingMode) {
+          return;
+        }
         this.renderer.updateAgentResponse(text, isThinking, isStart);
       },
       onToolCall: (name, input) => {
@@ -231,7 +243,7 @@ export class BlessedUI {
     };
 
     await this.agent.sendMessage(message, callbacks);
-    this.renderer.finalizeResponse(true);
+    this.renderer.finalizeResponse(this.thinkingMode);
   }
 
   /**
@@ -240,7 +252,23 @@ export class BlessedUI {
   showWelcome() {
     this.renderer.addSystemMessage('AI Agent Chat');
     this.renderer.getContent().push(formatSystem('Type your message and press Enter to send (Shift+Enter for newline). Press Ctrl+C to quit.'));
+    this.renderer.getContent().push(formatSystem('Type /help for available commands.'));
     this.renderer.getContent().push('');
+    this.renderer.render();
+  }
+
+  /**
+   * Show help message with available commands
+   */
+  showHelp() {
+    const chatContent = this.renderer.getContent();
+    chatContent.push(formatSystem('Available Commands:'));
+    chatContent.push('');
+    chatContent.push(formatSystem('/help      - Show this help message'));
+    chatContent.push(formatSystem('/debug     - Toggle debug mode (shows API requests/responses)'));
+    chatContent.push(formatSystem('/tools     - Toggle tools mode (shows tool calls)'));
+    chatContent.push(formatSystem('/thinking  - Toggle thinking mode (shows extended thinking)'));
+    chatContent.push('');
     this.renderer.render();
   }
 
